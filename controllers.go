@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -29,6 +32,23 @@ func BookCollection(c *mongo.Database) {
 	collection = c.Collection("books")
 }
 
+func GetBooks(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	bookss := []Book{}
+	err := collection.FindOne(context.TODO(), bson.M{}).Decode(&bookss)
+
+	if err != nil {
+
+		log.Fatal(err)
+
+	}
+	fmt.Println(bookss)
+
+	json.NewEncoder(w).Encode(bookss)
+
+	return
+}
+
 // InsertBook ... function to insert book to the db
 func InsertBook(title string, isbn string, id string, fname string, lname string) {
 
@@ -48,5 +68,4 @@ func InsertBook(title string, isbn string, id string, fname string, lname string
 	}
 
 	fmt.Println("Inserted post with ID:", insertResult.InsertedID)
-
 }
