@@ -27,6 +27,8 @@ type Book struct {
 	Author *Author `json:"author"`
 }
 
+var books []Book
+
 var collection *mongo.Collection
 
 // BookCollection ... function to get the collection
@@ -38,23 +40,24 @@ func BookCollection(c *mongo.Database) {
 func GetBooks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
-
+	var books []Book
 	cursor, err := collection.Find(context.TODO(), bson.D{})
 	if err != nil {
 		fmt.Println("Finding all documents ERROR:", err)
 	} else {
 		for cursor.Next(ctx) {
-			var result bson.M
+			var result Book
 			err := cursor.Decode(&result)
 
 			// If there is a cursor.Decode error
 			if err != nil {
 				fmt.Println("cursor.Next() error:", err)
 			} else {
-				json.NewEncoder(w).Encode(result)
+				books = append(books, result)
 			}
 		}
 	}
+	json.NewEncoder(w).Encode(books)
 }
 
 // GetBook ... get a single book by ID
@@ -82,7 +85,7 @@ func CreateBook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Inserted post with ID:", insertResult.InsertedID)
+	fmt.Println("Inserted post with ID:", insertResult)
 }
 
 // UpdateBook ... update book function
