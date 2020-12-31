@@ -50,5 +50,4 @@ func Connect() {
 	BookCollection(db)
 
 	return
-
 }
