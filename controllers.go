@@ -75,7 +75,7 @@ func GetBook(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateBook ... func to create a new book
-func CreateBook(w http.ResponseWriter, r *http.Request) {
+var CreateBook = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var book Book
 	_ = json.NewDecoder(r.Body).Decode(&book)
@@ -86,7 +86,7 @@ func CreateBook(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	fmt.Println("Inserted post with ID:", insertResult)
-}
+})
 
 // UpdateBook ... update book function
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
