@@ -17,5 +17,6 @@ func Routes(JwtMiddleware *jwtmiddleware.JWTMiddleware) {
 	r.Handle("/api/books", JwtMiddleware.Handler(CreateBook)).Methods("POST")
 	r.HandleFunc("/api/books/{id}", UpdateBook).Methods("PUT")
 	r.HandleFunc("/api/books/{id}", DeleteBook).Methods("DELETE")
+	r.HandleFunc("/login", Login).Methods("POST")
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
