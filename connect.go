@@ -46,8 +46,9 @@ func Connect() {
 		fmt.Println("Connected!")
 	}
 	db := client.Database("REST-API")
+	userDB := client.Database("User")
 
 	BookCollection(db)
-
+	UserCollection(userDB)
 	return
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Author ...
@@ -27,13 +29,26 @@ type Book struct {
 	Author *Author `json:"author"`
 }
 
+//User ...
+type User struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 var books []Book
 
 var collection *mongo.Collection
+var userCollection *mongo.Collection
 
 // BookCollection ... function to get the collection
 func BookCollection(c *mongo.Database) {
 	collection = c.Collection("books")
+}
+
+// UserCollection ... function to get the collection
+func UserCollection(c *mongo.Database) {
+	userCollection = c.Collection("users")
 }
 
 // GetBooks ... get all books from the db
@@ -80,6 +95,7 @@ var CreateBook = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	var book Book
 	_ = json.NewDecoder(r.Body).Decode(&book)
 	json.NewEncoder(w).Encode(book)
+	fmt.Println(book)
 	insertResult, err := collection.InsertOne(context.TODO(), book)
 
 	if err != nil {
@@ -130,4 +146,62 @@ func DeleteBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(deleteResult)
+}
+
+// ComparePassword hashes the test password and then compares
+// the two hashes.
+func ComparePassword(hashBase64, testPassword string) bool {
+
+	// Decode the real hashed and salted password so we can
+	// split out the salt
+	hashBytes, err := base64.StdEncoding.DecodeString(hashBase64)
+	if err != nil {
+		fmt.Println("Error, we were given invalid base64 string", err)
+		return false
+	}
+
+	err = bcrypt.CompareHashAndPassword(hashBytes, []byte(testPassword))
+	return err == nil
+}
+
+// HashPassword hashes the clear-text password and encodes it as base64,
+func HashPassword(password string) (string, error) {
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), 10 /*cost*/)
+	if err != nil {
+		return "", err
+	}
+
+	// Encode the entire thing as base64 and return
+	hashBase64 := base64.StdEncoding.EncodeToString(hashedBytes)
+
+	return hashBase64, nil
+}
+
+// Signup ... func to create users
+func Signup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var user User
+	_ = json.NewDecoder(r.Body).Decode(&user)
+	json.NewEncoder(w).Encode(user)
+	hashedPassword, _ := HashPassword(user.Password)
+	user.Password = hashedPassword
+
+	result, err := userCollection.Find(context.TODO(), bson.M{"username": user.Username})
+	if err != nil {
+		log.Fatal(err)
+	}
+	var userFiltered []bson.M
+	if err = result.All(context.TODO(), &userFiltered); err != nil {
+		log.Fatal(err)
+	}
+	if len(userFiltered) > 0 {
+		w.WriteHeader(401)
+		w.Write([]byte(`{"message": "User Already exists :("}`))
+	} else {
+		insertUser, err := userCollection.InsertOne(context.TODO(), user)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Inserted post with ID:", insertUser)
+	}
 }
