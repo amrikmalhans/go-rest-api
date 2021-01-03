@@ -7,9 +7,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
+	"github.com/twinj/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -27,6 +32,7 @@ type Book struct {
 	Isbn   string  `json:"isbn"`
 	Title  string  `json:"title"`
 	Author *Author `json:"author"`
+	UserID uint8   `json:"ID"`
 }
 
 //User ...
@@ -34,6 +40,24 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Token    string `json:"token"`
+	ID       uint8  `json:"ID"`
+}
+
+// TokenDetails ...
+type TokenDetails struct {
+	AccessToken  string
+	RefreshToken string
+	AccessUUID   string
+	RefreshUUID  string
+	AtExpires    int64
+	RtExpires    int64
+}
+
+//AccessDetails ...
+type AccessDetails struct {
+	AccessUUID string
+	UserID     uint8
 }
 
 var books []Book
@@ -49,6 +73,133 @@ func BookCollection(c *mongo.Database) {
 // UserCollection ... function to get the collection
 func UserCollection(c *mongo.Database) {
 	userCollection = c.Collection("users")
+}
+
+// CreateToken ... func to create jwt token
+func CreateToken(userid uint8) (*TokenDetails, error) {
+	td := &TokenDetails{}
+	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
+	td.AccessUUID = uuid.NewV4().String()
+
+	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
+	td.RefreshUUID = uuid.NewV4().String()
+
+	var err error
+	//Creating Access Token
+	os.Setenv("ACCESS_SECRET", "jdnfksdmfksd") //this should be in an env file
+	atClaims := jwt.MapClaims{}
+	atClaims["authorized"] = true
+	atClaims["access_uuid"] = td.AccessUUID
+	atClaims["user_id"] = userid
+	atClaims["exp"] = td.AtExpires
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
+	td.AccessToken, err = at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
+	if err != nil {
+		return nil, err
+	}
+	//Creating Refresh Token
+	os.Setenv("REFRESH_SECRET", "mcmvmkmsdnfsdmfdsjf") //this should be in an env file
+	rtClaims := jwt.MapClaims{}
+	rtClaims["refresh_uuid"] = td.RefreshUUID
+	rtClaims["user_id"] = userid
+	rtClaims["exp"] = td.RtExpires
+	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
+	td.RefreshToken, err = rt.SignedString([]byte(os.Getenv("REFRESH_SECRET")))
+	if err != nil {
+		return nil, err
+	}
+	return td, nil
+}
+
+// CreateAuth ... func to store tokens in redis
+func CreateAuth(userid uint8, td *TokenDetails) error {
+	at := time.Unix(td.AtExpires, 0) //converting Unix to UTC(to Time object)
+	rt := time.Unix(td.RtExpires, 0)
+	now := time.Now()
+
+	errAccess := Client.Set(td.AccessUUID, strconv.Itoa(int(userid)), at.Sub(now)).Err()
+	if errAccess != nil {
+		return errAccess
+	}
+	errRefresh := Client.Set(td.RefreshUUID, strconv.Itoa(int(userid)), rt.Sub(now)).Err()
+	if errRefresh != nil {
+		return errRefresh
+	}
+	return nil
+}
+
+//ExtractToken ... extract token duh!
+func ExtractToken(r *http.Request) string {
+	bearToken := r.Header.Get("Authorization")
+	//normally Authorization the_token_xxx
+	strArr := strings.Split(bearToken, " ")
+	if len(strArr) == 2 {
+		return strArr[1]
+	}
+	return ""
+}
+
+// VerifyToken ... to verify the token
+func VerifyToken(r *http.Request) (*jwt.Token, error) {
+	tokenString := ExtractToken(r)
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		//Make sure that the token method conform to "SigningMethodHMAC"
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(os.Getenv("ACCESS_SECRET")), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+//TokenValid ... to check if token is valid
+func TokenValid(r *http.Request) error {
+	token, err := VerifyToken(r)
+	if err != nil {
+		return err
+	}
+	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+		return err
+	}
+	return nil
+}
+
+//ExtractTokenMetadata ... extract data to look into redis
+func ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
+	token, err := VerifyToken(r)
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		accessUUID, ok := claims["access_uuid"].(string)
+		if !ok {
+			return nil, err
+		}
+		userID, err := strconv.ParseUint(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		return &AccessDetails{
+			AccessUUID: accessUUID,
+			UserID:     uint8(userID),
+		}, nil
+	}
+	return nil, err
+}
+
+//FetchAuth ... fetch data from redis
+func FetchAuth(authD *AccessDetails) (uint8, error) {
+	userid, err := Client.Get(authD.AccessUUID).Result()
+	if err != nil {
+		return 0, err
+	}
+	userID, _ := strconv.ParseUint(userid, 10, 64)
+	return uint8(userID), nil
 }
 
 // GetBooks ... get all books from the db
@@ -94,6 +245,17 @@ var CreateBook = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var book Book
 	_ = json.NewDecoder(r.Body).Decode(&book)
+	tokenAuth, err := ExtractTokenMetadata(r)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	userID, err := FetchAuth(tokenAuth)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	book.UserID = userID
 	json.NewEncoder(w).Encode(book)
 	fmt.Println(book)
 	insertResult, err := collection.InsertOne(context.TODO(), book)
@@ -184,7 +346,8 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	hashedPassword, _ := HashPassword(user.Password)
 	user.Password = hashedPassword
-
+	u2 := uuid.NewV4()
+	user.ID = u2.Variant()
 	userResult, err := userCollection.Find(context.TODO(), bson.M{"username": user.Username})
 	if err != nil {
 		log.Fatal(err)
@@ -236,13 +399,35 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		w.Write([]byte(`{"message": "successfully logged in!"}`))
+		ts, err := CreateToken(user.ID)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		saveErr := CreateAuth(user.ID, ts)
+		if saveErr != nil {
+			log.Fatal(err)
+		}
+		tokens := map[string]string{
+			"access_token":  ts.AccessToken,
+			"refresh_token": ts.RefreshToken,
+		}
+		// token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		// 	"username":   result.Username,
+		// 	"authorized": true,
+		// 	"exp":        time.Now().Add(time.Minute * 15).Unix(),
+		// })
+		// tokenString, err := token.SignedString([]byte("SUPER_SECRET"))
+
+		// if err != nil {
+		// 	log.Fatal(err)
+		// 	return
+		// }
+
+		// result.Token = tokenString
+		// result.Password = ""
+
+		json.NewEncoder(w).Encode(tokens)
 
 	}
-
-	// } else if len(emailFiltered) < 0 {
-
-	// } else {
-	// 	w.WriteHeader(200)
-	// 	w.Write([]byte(`{"message": "Welcome :)"}`))
-	// }
 }

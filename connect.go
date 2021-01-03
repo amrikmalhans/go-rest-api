@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -51,4 +52,23 @@ func Connect() {
 	BookCollection(db)
 	UserCollection(userDB)
 	return
+}
+
+// Client ... redis client
+var Client *redis.Client
+
+//Init ... func to initialise redis db
+func Init() {
+	//Initializing redis
+	dsn := os.Getenv("REDIS_DSN")
+	if len(dsn) == 0 {
+		dsn = "localhost:6379"
+	}
+	Client = redis.NewClient(&redis.Options{
+		Addr: dsn, //redis port
+	})
+	_, err := Client.Ping().Result()
+	if err != nil {
+		panic(err)
+	}
 }

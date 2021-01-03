@@ -90,6 +90,7 @@ func main() {
 	})
 
 	Connect()
+	Init()
 	Routes(JwtMiddleware)
 
 	r := mux.NewRouter()
