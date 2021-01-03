@@ -182,26 +182,37 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var user User
 	_ = json.NewDecoder(r.Body).Decode(&user)
-	json.NewEncoder(w).Encode(user)
 	hashedPassword, _ := HashPassword(user.Password)
 	user.Password = hashedPassword
 
-	result, err := userCollection.Find(context.TODO(), bson.M{"username": user.Username})
+	userResult, err := userCollection.Find(context.TODO(), bson.M{"username": user.Username})
 	if err != nil {
 		log.Fatal(err)
 	}
 	var userFiltered []bson.M
-	if err = result.All(context.TODO(), &userFiltered); err != nil {
+	if err = userResult.All(context.TODO(), &userFiltered); err != nil {
+		log.Fatal(err)
+	}
+	emailResult, err := userCollection.Find(context.TODO(), bson.M{"email": user.Email})
+	if err != nil {
+		log.Fatal(err)
+	}
+	var emailFiltered []bson.M
+	if err = emailResult.All(context.TODO(), &emailFiltered); err != nil {
 		log.Fatal(err)
 	}
 	if len(userFiltered) > 0 {
-		w.WriteHeader(401)
-		w.Write([]byte(`{"message": "User Already exists :("}`))
+		w.WriteHeader(409)
+		w.Write([]byte(`{"message": "Username Already exists :(, try something else"}`))
+	} else if len(emailFiltered) > 0 {
+		w.WriteHeader(409)
+		w.Write([]byte(`{"message": "Email Already exists :("}`))
 	} else {
 		insertUser, err := userCollection.InsertOne(context.TODO(), user)
 		if err != nil {
 			log.Fatal(err)
 		}
 		fmt.Println("Inserted post with ID:", insertUser)
+		json.NewEncoder(w).Encode(user)
 	}
 }
