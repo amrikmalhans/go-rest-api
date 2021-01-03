@@ -90,6 +90,7 @@ func main() {
 	})
 
 	Connect()
+	Init()
 	Routes(JwtMiddleware)
 
 	r := mux.NewRouter()
@@ -98,5 +99,5 @@ func main() {
 		AllowedHeaders: []string{"Content-Type", "Origin", "Accept", "*"},
 	})
 
-	log.Fatal(http.ListenAndServe(":8000", corsWrapper.Handler(r)))
+	log.Fatal(http.ListenAndServe(":9000", corsWrapper.Handler(r)))
 }
