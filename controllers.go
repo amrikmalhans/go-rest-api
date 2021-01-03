@@ -216,3 +216,53 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(user)
 	}
 }
+
+// Login ... func to log users in
+func Login(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var user User
+	_ = json.NewDecoder(r.Body).Decode(&user)
+	// hashedPassword, _ := HashPassword(user.Password)
+	// user.Password = hashedPassword
+	fmt.Println(user)
+	fmt.Println(user.Password)
+	var result User
+	err := userCollection.FindOne(context.TODO(), bson.D{{Key: "email", Value: user.Email}}).Decode(&result)
+	if err != nil {
+		log.Fatal("no user found in db with this email")
+	} else {
+		userPassword := ComparePassword(result.Password, user.Password)
+
+		if userPassword == true {
+			fmt.Println("coorecct")
+			return
+		}
+		fmt.Println("wrong pw")
+
+	}
+
+	// fmt.Println(passwordResult)
+	// var passwordFiltered []bson.M
+	// if err = passwordResult.All(context.TODO(), &passwordFiltered); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println(passwordFiltered)
+	// emailResult, err := userCollection.Find(context.TODO(), bson.M{"email": user.Email})
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// var emailFiltered []bson.M
+	// if err = emailResult.All(context.TODO(), &emailFiltered); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if len(passwordFiltered) > 0 {
+	// 	w.WriteHeader(401)
+	// 	w.Write([]byte(`{"message": "Wrong Password :(, try something else"}`))
+	// } else if len(emailFiltered) < 0 {
+	// 	w.WriteHeader(401)
+	// 	w.Write([]byte(`{"message": "Email Invalid :(, try something else"}`))
+	// } else {
+	// 	w.WriteHeader(200)
+	// 	w.Write([]byte(`{"message": "Welcome :)"}`))
+	// }
+}
