@@ -347,6 +347,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var user User
 	_ = json.NewDecoder(r.Body).Decode(&user)
+	fmt.Println(user)
 	hashedPassword, _ := HashPassword(user.Password)
 	user.Password = hashedPassword
 	u2 := uuid.New()
@@ -380,7 +381,9 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 		fmt.Println("Inserted post with ID:", insertUser)
+		user.Password = ""
 		json.NewEncoder(w).Encode(user)
+		w.WriteHeader(200)
 	}
 }
 
