@@ -13,8 +13,8 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/twinj/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -32,7 +32,7 @@ type Book struct {
 	Isbn   string  `json:"isbn"`
 	Title  string  `json:"title"`
 	Author *Author `json:"author"`
-	UserID uint8   `json:"ID"`
+	UserID uint64  `json:"ID"`
 }
 
 //User ...
@@ -41,7 +41,7 @@ type User struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Token    string `json:"token"`
-	ID       uint8  `json:"ID"`
+	ID       uint64 `json:"ID"`
 }
 
 // TokenDetails ...
@@ -57,7 +57,7 @@ type TokenDetails struct {
 //AccessDetails ...
 type AccessDetails struct {
 	AccessUUID string
-	UserID     uint8
+	UserID     uint64
 }
 
 var books []Book
@@ -76,13 +76,13 @@ func UserCollection(c *mongo.Database) {
 }
 
 // CreateToken ... func to create jwt token
-func CreateToken(userid uint8) (*TokenDetails, error) {
+func CreateToken(userid uint64) (*TokenDetails, error) {
 	td := &TokenDetails{}
 	td.AtExpires = time.Now().Add(time.Minute * 15).Unix()
-	td.AccessUUID = uuid.NewV4().String()
+	td.AccessUUID = uuid.New().String()
 
 	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
-	td.RefreshUUID = uuid.NewV4().String()
+	td.RefreshUUID = uuid.New().String()
 
 	var err error
 	//Creating Access Token
@@ -112,7 +112,7 @@ func CreateToken(userid uint8) (*TokenDetails, error) {
 }
 
 // CreateAuth ... func to store tokens in redis
-func CreateAuth(userid uint8, td *TokenDetails) error {
+func CreateAuth(userid uint64, td *TokenDetails) error {
 	at := time.Unix(td.AtExpires, 0) //converting Unix to UTC(to Time object)
 	rt := time.Unix(td.RtExpires, 0)
 	now := time.Now()
@@ -186,20 +186,21 @@ func ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 
 		return &AccessDetails{
 			AccessUUID: accessUUID,
-			UserID:     uint8(userID),
+			UserID:     uint64(userID),
 		}, nil
 	}
 	return nil, err
 }
 
 //FetchAuth ... fetch data from redis
-func FetchAuth(authD *AccessDetails) (uint8, error) {
+func FetchAuth(authD *AccessDetails) (uint64, error) {
 	userid, err := Client.Get(authD.AccessUUID).Result()
 	if err != nil {
 		return 0, err
 	}
+	fmt.Println(userid)
 	userID, _ := strconv.ParseUint(userid, 10, 64)
-	return uint8(userID), nil
+	return uint64(userID), nil
 }
 
 // GetBooks ... get all books from the db
@@ -250,12 +251,14 @@ var CreateBook = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 		return
 	}
+	fmt.Println(tokenAuth)
 	userID, err := FetchAuth(tokenAuth)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	book.UserID = userID
+	fmt.Println(userID)
 	json.NewEncoder(w).Encode(book)
 	fmt.Println(book)
 	insertResult, err := collection.InsertOne(context.TODO(), book)
@@ -346,8 +349,9 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	hashedPassword, _ := HashPassword(user.Password)
 	user.Password = hashedPassword
-	u2 := uuid.NewV4()
-	user.ID = u2.Variant()
+	u2 := uuid.New()
+	user.ID = uint64(u2.ID())
+	fmt.Println(user.ID)
 	userResult, err := userCollection.Find(context.TODO(), bson.M{"username": user.Username})
 	if err != nil {
 		log.Fatal(err)
@@ -399,12 +403,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		w.Write([]byte(`{"message": "successfully logged in!"}`))
-		ts, err := CreateToken(user.ID)
+		ts, err := CreateToken(result.ID)
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
-		saveErr := CreateAuth(user.ID, ts)
+		saveErr := CreateAuth(result.ID, ts)
 		if saveErr != nil {
 			log.Fatal(err)
 		}
