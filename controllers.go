@@ -404,8 +404,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`{"message": "Wrong Password :(, try something else"}`))
 			return
 		}
-		w.WriteHeader(200)
-		w.Write([]byte(`{"message": "successfully logged in!"}`))
 		ts, err := CreateToken(result.ID)
 		if err != nil {
 			log.Fatal(err)
