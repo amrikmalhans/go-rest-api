@@ -419,21 +419,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			"access_token":  ts.AccessToken,
 			"refresh_token": ts.RefreshToken,
 		}
-		// token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		// 	"username":   result.Username,
-		// 	"authorized": true,
-		// 	"exp":        time.Now().Add(time.Minute * 15).Unix(),
-		// })
-		// tokenString, err := token.SignedString([]byte("SUPER_SECRET"))
-
-		// if err != nil {
-		// 	log.Fatal(err)
-		// 	return
-		// }
-
-		// result.Token = tokenString
-		// result.Password = ""
-
 		json.NewEncoder(w).Encode(tokens)
 
 	}
