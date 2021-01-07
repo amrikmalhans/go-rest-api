@@ -440,6 +440,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 // Refresh ... refresh the tokens
 func Refresh(w http.ResponseWriter, r *http.Request) {
+	cookie := r.Cookies()
+	fmt.Println(cookie)
 	w.Header().Set("Content-Type", "application/json")
 	var refreshToken RefreshToken
 	_ = json.NewDecoder(r.Body).Decode(&refreshToken)
