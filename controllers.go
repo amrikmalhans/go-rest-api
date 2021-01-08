@@ -404,6 +404,8 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 // Login ... func to log users in
 func Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	var user User
 	_ = json.NewDecoder(r.Body).Decode(&user)
 	var result User

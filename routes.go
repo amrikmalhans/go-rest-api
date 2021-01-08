@@ -56,7 +56,7 @@ func Routes() {
 	r.HandleFunc("/api/books/{id}", UpdateBook).Methods("PUT")
 	r.HandleFunc("/api/books/{id}", DeleteBook).Methods("DELETE")
 	r.HandleFunc("/signup", Signup).Methods("POST")
-	r.HandleFunc("/login", Login).Methods("POST")
+	r.HandleFunc("/login", Login).Methods("POST", "OPTIONS")
 	r.HandleFunc("/tokens/refresh", Refresh).Methods("POST")
-	log.Fatal(http.ListenAndServe(":8000", corsWrapper.Handler(r)))
+	log.Fatal(http.ListenAndServe(":9000", corsWrapper.Handler(r)))
 }
