@@ -47,8 +47,10 @@ func middleware(next http.Handler) http.Handler {
 func Routes() {
 	r := mux.NewRouter()
 	corsWrapper := cors.New(cors.Options{
-		AllowedMethods: []string{"GET", "POST"},
-		AllowedHeaders: []string{"Content-Type", "Origin", "Accept", "*"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Origin", "Accept", "*"},
+		AllowCredentials: true,
+		AllowedOrigins:   []string{"http://localhost:3000"},
 	})
 	r.HandleFunc("/api/books", GetBooks).Methods("GET")
 	r.HandleFunc("/api/books/{id}", GetBook).Methods("GET")
@@ -57,6 +59,6 @@ func Routes() {
 	r.HandleFunc("/api/books/{id}", DeleteBook).Methods("DELETE")
 	r.HandleFunc("/signup", Signup).Methods("POST")
 	r.HandleFunc("/login", Login).Methods("POST", "OPTIONS")
-	r.HandleFunc("/tokens/refresh", Refresh).Methods("POST")
+	r.HandleFunc("/tokens/refresh", Refresh).Methods("POST", "OPTIONS")
 	log.Fatal(http.ListenAndServe(":9000", corsWrapper.Handler(r)))
 }
