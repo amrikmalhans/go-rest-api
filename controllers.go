@@ -404,7 +404,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 // Login ... func to log users in
 func Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4000")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	var user User
 	_ = json.NewDecoder(r.Body).Decode(&user)
@@ -507,6 +507,8 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 			"access_token":  ts.AccessToken,
 			"refresh_token": ts.RefreshToken,
 		}
+		cookie := &http.Cookie{Name: "refresh_token", Value: ts.RefreshToken, HttpOnly: true}
+		http.SetCookie(w, cookie)
 		json.NewEncoder(w).Encode(tokens)
 	} else {
 		json.NewEncoder(w).Encode(http.StatusUnauthorized)

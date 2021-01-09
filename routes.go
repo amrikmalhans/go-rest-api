@@ -50,7 +50,7 @@ func Routes() {
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Origin", "Accept", "*"},
 		AllowCredentials: true,
-		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedOrigins:   []string{"http://localhost:4000"},
 	})
 	r.HandleFunc("/api/books", GetBooks).Methods("GET")
 	r.HandleFunc("/api/books/{id}", GetBook).Methods("GET")
