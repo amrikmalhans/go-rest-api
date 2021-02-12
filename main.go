@@ -1,8 +1,14 @@
 package main
 
+import (
+	"restapi/helpers"
+	"restapi/routes"
+)
+
 func main() {
 
-	Connect()
-	Init()
-	Routes()
+	helpers.Connect()
+	helpers.Init()
+	routes.Routes()
 }
+ 
